@@ -1,22 +1,17 @@
 package main
 
 import (
-	"log"
+	"fmt"
 
 	"github.com/JneiraS/GotoServ/internal/api"
 	"github.com/JneiraS/GotoServ/pkg/utils"
-	"github.com/joho/godotenv"
 )
 
 func main() {
-	loadEnvironmentVariables()
+	utils.LoadEnvironmentVariables()
 	utils.CreatJsonFromCsv()
 	router := api.NewRouter("assignement_fcb.json")
 	api.StartServer(router)
-}
-
-func loadEnvironmentVariables() {
-	if err := godotenv.Load(); err != nil {
-		log.Printf(".env not loaded: %v", err)
-	}
+	code, _ := utils.GenerateCurrentTOTP("JHTSW6W3")
+	fmt.Printf("%s", code)
 }
