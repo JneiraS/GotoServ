@@ -15,6 +15,62 @@ const (
 	jsonPath = "assignement_fcb.json"
 )
 
+// UpdateOrAddCSVRecord met à jour une ligne existante (par agent) ou ajoute une nouvelle ligne dans le CSV.
+func UpdateOrAddCSVRecord(csvPath, agent, scope, keywords string) error {
+	// Lire tout le CSV
+	file, err := os.OpenFile(csvPath, os.O_RDWR, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	reader.Comma = ';'
+	records, err := reader.ReadAll()
+	if err != nil {
+		return err
+	}
+
+	// Chercher si l'agent existe déjà
+	found := false
+	for i, row := range records {
+		if i == 0 {
+			continue // skip header
+		}
+		if len(row) > 0 && row[0] == agent {
+			if len(row) > 1 {
+				records[i][1] = scope
+			}
+			if len(row) > 2 {
+				records[i][2] = keywords
+			}
+			found = true
+			break
+		}
+	}
+
+	// Ajouter une nouvelle ligne si non trouvé
+	if !found {
+		records = append(records, []string{agent, scope, keywords})
+	}
+
+	// Réécrire tout le CSV
+	if err := file.Truncate(0); err != nil {
+		return err
+	}
+	if _, err := file.Seek(0, 0); err != nil {
+		return err
+	}
+	writer := csv.NewWriter(file)
+	writer.Comma = ';'
+	err = writer.WriteAll(records)
+	if err != nil {
+		return err
+	}
+	writer.Flush()
+	return writer.Error()
+}
+
 // ConvertCSVToJSONGeneric convertit n'importe quel CSV en JSON (tableau d'objets).
 // Les clés JSON sont les noms de colonnes de l'en-tête CSV.
 func ConvertCSVToJSONGeneric(csvPath, jsonPath string, delimiter rune) error {
