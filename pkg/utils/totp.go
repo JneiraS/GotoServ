@@ -46,7 +46,7 @@ func GenerateCurrentTOTP(secret string) (string, error) {
 
 	return totp.GenerateCodeCustom(key, time.Now(), totp.ValidateOpts{
 		Period:    60,
-		Digits:    otp.DigitsSix,
+		Digits:    otp.DigitsEight,
 		Algorithm: otp.AlgorithmSHA256,
 	})
 }
@@ -60,7 +60,7 @@ func ValidateTOTP(secret, code string) (bool, error) {
 	return totp.ValidateCustom(code, key, time.Now(), totp.ValidateOpts{
 		Period:    60,
 		Skew:      1,
-		Digits:    otp.DigitsSix,
+		Digits:    otp.DigitsEight,
 		Algorithm: otp.AlgorithmSHA256,
 	})
 }
