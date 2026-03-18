@@ -3,27 +3,30 @@ package api
 import (
 	"os"
 
+	cts "github.com/JneiraS/GotoServ/internal/constants"
 	"github.com/JneiraS/GotoServ/pkg/utils"
 	"github.com/gin-gonic/gin"
 )
 
-func NewRouter(assignmentsFilePath string) *gin.Engine {
+func NewRouter() *gin.Engine {
 	router := gin.Default()
 	secret := os.Getenv("SECRET_KEY")
 
+	// Endpoint pour récupérer les assignments au format JSON
 	router.GET("/:totp/assignments", func(c *gin.Context) {
 		code := c.Param("totp")
 		r, err := utils.ValidateTOTP(secret, code)
 		if err == nil && r == true {
-			c.File(assignmentsFilePath + ".json")
+			c.File(cts.AssignmentsJSON)
 		}
 
 	})
-
+	// Endpoint de santé pour vérifier que le serveur fonctionne
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
+	// Endpoint pour ajouter ou mettre à jour un assignment
 	router.POST("/:totp/add", func(c *gin.Context) {
 		code := c.Param("totp")
 		r, err := utils.ValidateTOTP(secret, code)
@@ -42,7 +45,7 @@ func NewRouter(assignmentsFilePath string) *gin.Engine {
 			return
 		}
 
-		if err := utils.UpdateOrAddCSVRecord(assignmentsFilePath+".csv", req.Agent, req.Scope, req.Keywords); err != nil {
+		if err := utils.UpdateOrAddCSVRecord(cts.AssignmentsCSV, req.Agent, req.Scope, req.Keywords); err != nil {
 			c.JSON(500, gin.H{"error": "failed to update CSV"})
 			return
 		}

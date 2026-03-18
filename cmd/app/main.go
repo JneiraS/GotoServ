@@ -9,6 +9,6 @@ func main() {
 
 	utils.LoadEnvironmentVariables()
 	utils.CreatJsonFromCsv()
-	router := api.NewRouter("assignement_fcb")
+	router := api.NewRouter()
 	api.StartServer(router)
 }

@@ -8,17 +8,13 @@ import (
 	"log"
 	"os"
 	"strings"
-)
 
-const (
-	csvPath  = "assignement_fcb.csv"
-	jsonPath = "assignement_fcb.json"
+	cts "github.com/JneiraS/GotoServ/internal/constants"
 )
 
 // UpdateOrAddCSVRecord met à jour une ligne existante (par agent) ou ajoute une nouvelle ligne dans le CSV.
-func UpdateOrAddCSVRecord(csvPath, agent, scope, keywords string) error {
-	// Lire tout le CSV
-	file, err := os.OpenFile(csvPath, os.O_RDWR, 0644)
+func UpdateOrAddCSVRecord(AssignmentsCSV, agent, scope, keywords string) error {
+	file, err := os.OpenFile(AssignmentsCSV, os.O_RDWR, 0644)
 	if err != nil {
 		return err
 	}
@@ -31,40 +27,45 @@ func UpdateOrAddCSVRecord(csvPath, agent, scope, keywords string) error {
 		return err
 	}
 
-	// Chercher si l'agent existe déjà
+	// Upsert par (scope, keywords), pas par agent
 	found := false
+	targetScope := strings.TrimSpace(scope)
+	targetKeywords := strings.TrimSpace(keywords)
+
 	for i, row := range records {
 		if i == 0 {
-			continue // skip header
+			continue // header
 		}
-		if len(row) > 0 && row[0] == agent {
-			if len(row) > 1 {
-				records[i][1] = scope
-			}
-			if len(row) > 2 {
-				records[i][2] = keywords
-			}
+		if len(row) < 3 {
+			continue
+		}
+
+		rowScope := strings.TrimSpace(row[1])
+		rowKeywords := strings.TrimSpace(row[2])
+
+		if strings.EqualFold(rowScope, targetScope) && rowKeywords == targetKeywords {
+			records[i][0] = agent    // agent
+			records[i][1] = scope    // scope
+			records[i][2] = keywords // keywords
 			found = true
 			break
 		}
 	}
 
-	// Ajouter une nouvelle ligne si non trouvé
 	if !found {
 		records = append(records, []string{agent, scope, keywords})
 	}
 
-	// Réécrire tout le CSV
 	if err := file.Truncate(0); err != nil {
 		return err
 	}
 	if _, err := file.Seek(0, 0); err != nil {
 		return err
 	}
+
 	writer := csv.NewWriter(file)
 	writer.Comma = ';'
-	err = writer.WriteAll(records)
-	if err != nil {
+	if err := writer.WriteAll(records); err != nil {
 		return err
 	}
 	writer.Flush()
@@ -73,8 +74,8 @@ func UpdateOrAddCSVRecord(csvPath, agent, scope, keywords string) error {
 
 // ConvertCSVToJSONGeneric convertit n'importe quel CSV en JSON (tableau d'objets).
 // Les clés JSON sont les noms de colonnes de l'en-tête CSV.
-func ConvertCSVToJSONGeneric(csvPath, jsonPath string, delimiter rune) error {
-	rows, err := ReadCSVAsMaps(csvPath, delimiter)
+func ConvertCSVToJSONGeneric(AssignmentsCSV, AssignmentsJSON string, delimiter rune) error {
+	rows, err := ReadCSVAsMaps(AssignmentsCSV, delimiter)
 	if err != nil {
 		return err
 	}
@@ -84,7 +85,7 @@ func ConvertCSVToJSONGeneric(csvPath, jsonPath string, delimiter rune) error {
 		return fmt.Errorf("marshal json: %w", err)
 	}
 
-	if err := os.WriteFile(jsonPath, out, 0o644); err != nil {
+	if err := os.WriteFile(AssignmentsJSON, out, 0o644); err != nil {
 		return fmt.Errorf("write json: %w", err)
 	}
 
@@ -92,12 +93,12 @@ func ConvertCSVToJSONGeneric(csvPath, jsonPath string, delimiter rune) error {
 }
 
 // ReadCSVAsMaps lit un CSV et retourne []map[colonne]valeur.
-func ReadCSVAsMaps(csvPath string, delimiter rune) ([]map[string]string, error) {
+func ReadCSVAsMaps(AssignmentsCSV string, delimiter rune) ([]map[string]string, error) {
 	if delimiter == 0 {
 		delimiter = ';'
 	}
 
-	f, err := os.Open(csvPath)
+	f, err := os.Open(AssignmentsCSV)
 	if err != nil {
 		return nil, fmt.Errorf("open csv: %w", err)
 	}
@@ -148,10 +149,10 @@ func ReadCSVAsMaps(csvPath string, delimiter rune) ([]map[string]string, error) 
 }
 
 // CreatJsonFromCsv converts a CSV file to a JSON file using a semicolon as the delimiter.
-// It reads from csvPath and writes the output to jsonPath.
+// It reads from AssignmentsCSV and writes the output to AssignmentsJSON.
 // If the conversion fails, the program exits with a fatal error.
 func CreatJsonFromCsv() {
-	if err := ConvertCSVToJSONGeneric(csvPath, jsonPath, ';'); err != nil {
+	if err := ConvertCSVToJSONGeneric(cts.AssignmentsCSV, cts.AssignmentsJSON, ';'); err != nil {
 		log.Fatal(err)
 	}
 }
