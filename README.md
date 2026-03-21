@@ -2,6 +2,20 @@
 
 API Go (Gin) pour lire et mettre à jour des assignments stockés en CSV, avec protection TOTP.
 
+
+## Authentification TOTP: robuste par conception
+
+Le système d’authentification TOTP de GotoServ a été conçu pour être solide, pragmatique et adapté aux usages API:
+
+- Authentification à usage court: chaque requête sensible est validée avec un code TOTP éphémère.
+- Paramètres renforcés: TOTP sur 8 chiffres avec SHA-256 et intervalle de 60 secondes.
+- Secret obligatoire au démarrage: l’application refuse de démarrer sans `SECRET_KEY` valide.
+- Secret non exposé dans l’URL: le code est transmis via le header `X-TOTP-Code`, ce qui réduit fortement les fuites dans les logs d’accès.
+- Contrôles systématiques: les routes protégées renvoient explicitement `401 unauthorized` en cas d’échec.
+- Défense en profondeur: limitation de débit (`429`) pour freiner les tentatives abusives.
+- Couche de données sécurisée: les opérations d’écriture CSV/JSON sont sérialisées pour éviter les corruptions concurrentes.
+
+
 ## Prérequis
 
 - Go 1.25+
