@@ -1,0 +1,26 @@
+services:
+  gotoserv:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ${BUILD_TARGET:-runtime-local}
+      args:
+        GIT_REPO: ${GIT_REPO:-https://github.com/JneiraS/GotoServ.git}
+        GIT_REF: ${GIT_REF:-main}
+    container_name: gotoserv
+    env_file:
+      - .env
+    environment:
+      - PORT=${PORT:-8080}
+      - GIN_MODE=release
+    volumes:
+      - ./assignement_fcb.csv:/app/assignement_fcb.csv:rw,z
+    ports:
+      - "${HOST_PORT:-8080}:${PORT:-8080}"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${PORT:-8080}/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
