@@ -35,7 +35,7 @@ ENV GIN_MODE=release
 EXPOSE 8080
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:${PORT}/health >/dev/null || exit 1
+    CMD wget -qO- http://127.0.0.1:${PORT}/health >/dev/null || exit 1
 
 CMD ["/app/gotoserv"]
 
@@ -52,6 +52,6 @@ ENV GIN_MODE=release
 EXPOSE 8080
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:${PORT}/health >/dev/null || exit 1
+    CMD wget -qO- http://127.0.0.1:${PORT}/health >/dev/null || exit 1
 
 CMD ["/app/gotoserv"]
