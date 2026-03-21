@@ -1,7 +1,9 @@
 package api
 
 import (
+	"net/http"
 	"os"
+	"time"
 
 	cts "github.com/JneiraS/GotoServ/internal/constants"
 	"github.com/JneiraS/GotoServ/pkg/utils"
@@ -10,15 +12,22 @@ import (
 
 func NewRouter() *gin.Engine {
 	router := gin.Default()
+	router.Use(rateLimitMiddleware(30, time.Minute))
+	router.Use(func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64*1024)
+		c.Next()
+	})
 	secret := os.Getenv("SECRET_KEY")
 
 	// Endpoint pour récupérer les assignments au format JSON
 	router.GET("/:totp/assignments", func(c *gin.Context) {
 		code := c.Param("totp")
 		r, err := utils.ValidateTOTP(secret, code)
-		if err == nil && r == true {
-			c.File(cts.AssignmentsJSON)
+		if err != nil || !r {
+			c.JSON(401, gin.H{"error": "unauthorized"})
+			return
 		}
+		c.File(cts.AssignmentsJSON)
 
 	})
 	// Endpoint de santé pour vérifier que le serveur fonctionne
@@ -49,7 +58,6 @@ func NewRouter() *gin.Engine {
 			c.JSON(500, gin.H{"error": "failed to update CSV"})
 			return
 		}
-		utils.CreatJsonFromCsv()
 		c.JSON(200, gin.H{"status": "CSV updated"})
 	})
 
@@ -81,7 +89,6 @@ func NewRouter() *gin.Engine {
 			return
 		}
 
-		utils.CreatJsonFromCsv()
 		c.JSON(200, gin.H{"status": "keywords updated"})
 	})
 

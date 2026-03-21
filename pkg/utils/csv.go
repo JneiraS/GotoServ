@@ -8,13 +8,27 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 
 	cts "github.com/JneiraS/GotoServ/internal/constants"
 )
 
+var assignmentsDataMu sync.Mutex
+
 // UpdateOrAddCSVRecord met à jour une ligne existante (par agent) ou ajoute une nouvelle ligne dans le CSV.
-func UpdateOrAddCSVRecord(AssignmentsCSV, agent, scope, keywords string) error {
-	file, err := os.OpenFile(AssignmentsCSV, os.O_RDWR, 0644)
+func UpdateOrAddCSVRecord(assignmentsCSV, agent, scope, keywords string) error {
+	assignmentsDataMu.Lock()
+	defer assignmentsDataMu.Unlock()
+
+	if err := updateOrAddCSVRecordUnlocked(assignmentsCSV, agent, scope, keywords); err != nil {
+		return err
+	}
+
+	return ConvertCSVToJSONGeneric(cts.AssignmentsCSV, cts.AssignmentsJSON, ';')
+}
+
+func updateOrAddCSVRecordUnlocked(assignmentsCSV, agent, scope, keywords string) error {
+	file, err := os.OpenFile(assignmentsCSV, os.O_RDWR, 0644)
 	if err != nil {
 		return err
 	}
@@ -27,14 +41,13 @@ func UpdateOrAddCSVRecord(AssignmentsCSV, agent, scope, keywords string) error {
 		return err
 	}
 
-	// Upsert par (scope, keywords), pas par agent
 	found := false
 	targetScope := strings.TrimSpace(scope)
 	targetKeywords := strings.TrimSpace(keywords)
 
 	for i, row := range records {
 		if i == 0 {
-			continue // header
+			continue
 		}
 		if len(row) < 3 {
 			continue
@@ -44,9 +57,9 @@ func UpdateOrAddCSVRecord(AssignmentsCSV, agent, scope, keywords string) error {
 		rowKeywords := strings.TrimSpace(row[2])
 
 		if strings.EqualFold(rowScope, targetScope) && rowKeywords == targetKeywords {
-			records[i][0] = agent    // agent
-			records[i][1] = scope    // scope
-			records[i][2] = keywords // keywords
+			records[i][0] = agent
+			records[i][1] = scope
+			records[i][2] = keywords
 			found = true
 			break
 		}
@@ -56,25 +69,28 @@ func UpdateOrAddCSVRecord(AssignmentsCSV, agent, scope, keywords string) error {
 		records = append(records, []string{agent, scope, keywords})
 	}
 
-	if err := file.Truncate(0); err != nil {
-		return err
-	}
-	if _, err := file.Seek(0, 0); err != nil {
-		return err
-	}
-
-	writer := csv.NewWriter(file)
-	writer.Comma = ';'
-	if err := writer.WriteAll(records); err != nil {
-		return err
-	}
-	writer.Flush()
-	return writer.Error()
+	return writeCSVRecords(file, records)
 }
 
 // UpdateKeywordsForAgent met à jour uniquement les keywords d'une ligne identifiée par agent.
 // Retourne false si l'agent n'existe pas dans le CSV.
 func UpdateKeywordsForAgent(assignmentsCSV, agent, keywords string) (bool, error) {
+	assignmentsDataMu.Lock()
+	defer assignmentsDataMu.Unlock()
+
+	found, err := updateKeywordsForAgentUnlocked(assignmentsCSV, agent, keywords)
+	if err != nil || !found {
+		return found, err
+	}
+
+	if err := ConvertCSVToJSONGeneric(cts.AssignmentsCSV, cts.AssignmentsJSON, ';'); err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func updateKeywordsForAgentUnlocked(assignmentsCSV, agent, keywords string) (bool, error) {
 	file, err := os.OpenFile(assignmentsCSV, os.O_RDWR, 0644)
 	if err != nil {
 		return false, err
@@ -92,7 +108,7 @@ func UpdateKeywordsForAgent(assignmentsCSV, agent, keywords string) (bool, error
 	target := strings.TrimSpace(agent)
 	for i, row := range records {
 		if i == 0 {
-			continue // header
+			continue
 		}
 		if len(row) < 3 {
 			continue
@@ -108,26 +124,34 @@ func UpdateKeywordsForAgent(assignmentsCSV, agent, keywords string) (bool, error
 		return false, nil
 	}
 
-	if err := file.Truncate(0); err != nil {
+	if err := writeCSVRecords(file, records); err != nil {
 		return false, err
 	}
+
+	return true, nil
+}
+
+func writeCSVRecords(file *os.File, records [][]string) error {
+	if err := file.Truncate(0); err != nil {
+		return err
+	}
 	if _, err := file.Seek(0, 0); err != nil {
-		return false, err
+		return err
 	}
 
 	writer := csv.NewWriter(file)
 	writer.Comma = ';'
 	if err := writer.WriteAll(records); err != nil {
-		return false, err
+		return err
 	}
 	writer.Flush()
-	return true, writer.Error()
+	return writer.Error()
 }
 
 // ConvertCSVToJSONGeneric convertit n'importe quel CSV en JSON (tableau d'objets).
 // Les clés JSON sont les noms de colonnes de l'en-tête CSV.
-func ConvertCSVToJSONGeneric(AssignmentsCSV, AssignmentsJSON string, delimiter rune) error {
-	rows, err := ReadCSVAsMaps(AssignmentsCSV, delimiter)
+func ConvertCSVToJSONGeneric(assignmentsCSV, assignmentsJSON string, delimiter rune) error {
+	rows, err := ReadCSVAsMaps(assignmentsCSV, delimiter)
 	if err != nil {
 		return err
 	}
@@ -137,7 +161,7 @@ func ConvertCSVToJSONGeneric(AssignmentsCSV, AssignmentsJSON string, delimiter r
 		return fmt.Errorf("marshal json: %w", err)
 	}
 
-	if err := os.WriteFile(AssignmentsJSON, out, 0o644); err != nil {
+	if err := os.WriteFile(assignmentsJSON, out, 0o644); err != nil {
 		return fmt.Errorf("write json: %w", err)
 	}
 
@@ -145,12 +169,12 @@ func ConvertCSVToJSONGeneric(AssignmentsCSV, AssignmentsJSON string, delimiter r
 }
 
 // ReadCSVAsMaps lit un CSV et retourne []map[colonne]valeur.
-func ReadCSVAsMaps(AssignmentsCSV string, delimiter rune) ([]map[string]string, error) {
+func ReadCSVAsMaps(assignmentsCSV string, delimiter rune) ([]map[string]string, error) {
 	if delimiter == 0 {
 		delimiter = ';'
 	}
 
-	f, err := os.Open(AssignmentsCSV)
+	f, err := os.Open(assignmentsCSV)
 	if err != nil {
 		return nil, fmt.Errorf("open csv: %w", err)
 	}
@@ -188,7 +212,6 @@ func ReadCSVAsMaps(AssignmentsCSV string, delimiter rune) ([]map[string]string, 
 			}
 		}
 
-		// Colonnes en trop: extra_1, extra_2, ...
 		for i := len(header); i < len(record); i++ {
 			key := fmt.Sprintf("extra_%d", i-len(header)+1)
 			row[key] = strings.TrimSpace(record[i])
@@ -204,6 +227,9 @@ func ReadCSVAsMaps(AssignmentsCSV string, delimiter rune) ([]map[string]string, 
 // It reads from AssignmentsCSV and writes the output to AssignmentsJSON.
 // If the conversion fails, the program exits with a fatal error.
 func CreatJsonFromCsv() {
+	assignmentsDataMu.Lock()
+	defer assignmentsDataMu.Unlock()
+
 	if err := ConvertCSVToJSONGeneric(cts.AssignmentsCSV, cts.AssignmentsJSON, ';'); err != nil {
 		log.Fatal(err)
 	}

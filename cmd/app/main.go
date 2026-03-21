@@ -8,6 +8,7 @@ import (
 func main() {
 
 	utils.LoadEnvironmentVariables()
+	utils.ValidateSecretKey()
 	utils.CreatJsonFromCsv()
 	router := api.NewRouter()
 	api.StartServer(router)
