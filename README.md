@@ -40,15 +40,44 @@ curl -X POST "http://127.0.0.1:8080/123456/add" \
   -d '{"agent":"copilot","scope":"api","keywords":"docker,totp"}'
 ```
 
-## Docker Compose
+## Makefile
 
-### 1) Mode local (code du workspace)
+| Commande | Action |
+|---|---|
+| `make up` | Build + lance depuis le code local (port hôte: `5050`) |
+| `make up-github` | Build + lance depuis GitHub |
+| `make down` | Arrête le service |
+| `make logs` | Suit les logs en temps réel |
+| `make ps` | Statut du conteneur |
+| `make build` | Build image locale sans démarrer |
+| `make build-github` | Build image GitHub sans démarrer |
+| `make test` | Lance les tests Go |
+| `make clean` | Arrête + supprime les images |
+
+Les variables ont des valeurs par défaut overridables:
+
+```bash
+make up-github HOST_PORT=9090 GIT_REF=develop
+```
+
+Valeurs par défaut du Makefile:
+
+| Variable | Défaut |
+|---|---|
+| `HOST_PORT` | `5050` |
+| `PORT` | `8080` |
+| `GIT_REPO` | `https://github.com/JneiraS/GotoServ.git` |
+| `GIT_REF` | `main` |
+
+## Docker Compose (sans Makefile)
+
+### Mode local
 
 ```bash
 docker compose up -d --build
 ```
 
-### 2) Mode GitHub (code cloné pendant le build)
+### Mode GitHub
 
 ```bash
 BUILD_TARGET=runtime-github \
@@ -57,53 +86,32 @@ GIT_REF=main \
 docker compose up -d --build
 ```
 
-### 3) Choisir un autre port
-
-Changer seulement le port hôte (recommandé):
+### Choisir un port hôte différent
 
 ```bash
-HOST_PORT=9090 PORT=8080 BUILD_TARGET=runtime-github docker compose up -d --build
-```
-
-Changer aussi le port interne de l'app:
-
-```bash
-HOST_PORT=9090 PORT=9090 BUILD_TARGET=runtime-github docker compose up -d --build
+HOST_PORT=9090 PORT=8080 docker compose up -d --build
 ```
 
 Tester la santé:
 
 ```bash
-curl -i http://127.0.0.1:${HOST_PORT:-8080}/health
+curl -i http://127.0.0.1:5050/health
 ```
 
 ## Variables Compose disponibles
 
-- `BUILD_TARGET`:
-  - `runtime-local` (défaut)
-  - `runtime-github`
+- `BUILD_TARGET`: `runtime-local` (défaut) ou `runtime-github`
 - `GIT_REPO` (défaut: `https://github.com/JneiraS/GotoServ.git`)
 - `GIT_REF` (défaut: `main`)
-- `HOST_PORT` (défaut: `8080`)
+- `HOST_PORT` (défaut: `5050` via Makefile, `8080` via Compose seul)
 - `PORT` (défaut: `8080`)
 
 ## Persistance des données
 
 Le fichier `assignement_fcb.csv` est monté en volume:
 
-- `./assignement_fcb.csv:/app/assignement_fcb.csv:rw,z`
-
-Les modifications faites via `POST /:totp/add` persistent donc côté hôte.
-
-## Commandes utiles
-
-```bash
-# Voir les logs
-docker compose logs -f gotoserv
-
-# Vérifier l'état
-docker compose ps
-
-# Arrêter
-docker compose down
 ```
+./assignement_fcb.csv:/app/assignement_fcb.csv:rw,z
+```
+
+Les modifications faites via `POST /:totp/add` persistent côté hôte après redémarrage du conteneur.
