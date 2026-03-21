@@ -53,5 +53,37 @@ func NewRouter() *gin.Engine {
 		c.JSON(200, gin.H{"status": "CSV updated"})
 	})
 
+	// Endpoint pour mettre à jour les keywords d'un agent existant
+	router.PATCH("/:totp/keywords", func(c *gin.Context) {
+		code := c.Param("totp")
+		r, err := utils.ValidateTOTP(secret, code)
+		if err != nil || !r {
+			c.JSON(401, gin.H{"error": "unauthorized"})
+			return
+		}
+
+		var req struct {
+			Agent    string `form:"agent" json:"agent" binding:"required"`
+			Keywords string `form:"keywords" json:"keywords" binding:"required"`
+		}
+		if err := c.ShouldBind(&req); err != nil {
+			c.JSON(400, gin.H{"error": "missing fields"})
+			return
+		}
+
+		found, err := utils.UpdateKeywordsForAgent(cts.AssignmentsCSV, req.Agent, req.Keywords)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "failed to update keywords"})
+			return
+		}
+		if !found {
+			c.JSON(404, gin.H{"error": "agent not found"})
+			return
+		}
+
+		utils.CreatJsonFromCsv()
+		c.JSON(200, gin.H{"status": "keywords updated"})
+	})
+
 	return router
 }

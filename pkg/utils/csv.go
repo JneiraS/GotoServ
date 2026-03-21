@@ -72,6 +72,58 @@ func UpdateOrAddCSVRecord(AssignmentsCSV, agent, scope, keywords string) error {
 	return writer.Error()
 }
 
+// UpdateKeywordsForAgent met à jour uniquement les keywords d'une ligne identifiée par agent.
+// Retourne false si l'agent n'existe pas dans le CSV.
+func UpdateKeywordsForAgent(assignmentsCSV, agent, keywords string) (bool, error) {
+	file, err := os.OpenFile(assignmentsCSV, os.O_RDWR, 0644)
+	if err != nil {
+		return false, err
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	reader.Comma = ';'
+	records, err := reader.ReadAll()
+	if err != nil {
+		return false, err
+	}
+
+	found := false
+	target := strings.TrimSpace(agent)
+	for i, row := range records {
+		if i == 0 {
+			continue // header
+		}
+		if len(row) < 3 {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(row[0]), target) {
+			records[i][2] = keywords
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return false, nil
+	}
+
+	if err := file.Truncate(0); err != nil {
+		return false, err
+	}
+	if _, err := file.Seek(0, 0); err != nil {
+		return false, err
+	}
+
+	writer := csv.NewWriter(file)
+	writer.Comma = ';'
+	if err := writer.WriteAll(records); err != nil {
+		return false, err
+	}
+	writer.Flush()
+	return true, writer.Error()
+}
+
 // ConvertCSVToJSONGeneric convertit n'importe quel CSV en JSON (tableau d'objets).
 // Les clés JSON sont les noms de colonnes de l'en-tête CSV.
 func ConvertCSVToJSONGeneric(AssignmentsCSV, AssignmentsJSON string, delimiter rune) error {
