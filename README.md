@@ -29,15 +29,35 @@ go run ./cmd/app
 ## Endpoints
 
 - `GET /health`
-- `GET /:totp/assignments`
-- `POST /:totp/add`
+- `GET /assignments`
+- `POST /add`
+- `PATCH /keywords`
+
+Pour les endpoints protégés, envoyer le TOTP dans le header `X-TOTP-Code`.
+
+Exemple GET:
+
+```bash
+curl -X GET "http://127.0.0.1:8080/assignments" \
+  -H "X-TOTP-Code: 12345678"
+```
 
 Exemple POST:
 
 ```bash
-curl -X POST "http://127.0.0.1:8080/123456/add" \
+curl -X POST "http://127.0.0.1:8080/add" \
   -H "Content-Type: application/json" \
+  -H "X-TOTP-Code: 12345678" \
   -d '{"agent":"copilot","scope":"api","keywords":"docker,totp"}'
+```
+
+Exemple PATCH:
+
+```bash
+curl -X PATCH "http://127.0.0.1:8080/keywords" \
+  -H "Content-Type: application/json" \
+  -H "X-TOTP-Code: 12345678" \
+  -d '{"agent":"copilot","keywords":"docker,totp,security"}'
 ```
 
 ## Makefile

@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	cts "github.com/JneiraS/GotoServ/internal/constants"
@@ -20,8 +21,8 @@ func NewRouter() *gin.Engine {
 	secret := os.Getenv("SECRET_KEY")
 
 	// Endpoint pour récupérer les assignments au format JSON
-	router.GET("/:totp/assignments", func(c *gin.Context) {
-		code := c.Param("totp")
+	router.GET("/assignments", func(c *gin.Context) {
+		code := totpCodeFromHeader(c)
 		r, err := utils.ValidateTOTP(secret, code)
 		if err != nil || !r {
 			c.JSON(401, gin.H{"error": "unauthorized"})
@@ -36,21 +37,22 @@ func NewRouter() *gin.Engine {
 	})
 
 	// Endpoint pour ajouter ou mettre à jour un assignment
-	router.POST("/:totp/add", func(c *gin.Context) {
-		code := c.Param("totp")
-		r, err := utils.ValidateTOTP(secret, code)
-		if err != nil || !r {
-			c.JSON(401, gin.H{"error": "unauthorized"})
-			return
-		}
-
+	router.POST("/add", func(c *gin.Context) {
 		var req struct {
+			TOTP     string `form:"totp" json:"totp"`
 			Agent    string `form:"agent" json:"agent" binding:"required"`
 			Scope    string `form:"scope" json:"scope" binding:"required"`
 			Keywords string `form:"keywords" json:"keywords" binding:"required"`
 		}
 		if err := c.ShouldBind(&req); err != nil {
 			c.JSON(400, gin.H{"error": "missing fields"})
+			return
+		}
+
+		code := totpCodeFromRequest(c, req.TOTP)
+		r, err := utils.ValidateTOTP(secret, code)
+		if err != nil || !r {
+			c.JSON(401, gin.H{"error": "unauthorized"})
 			return
 		}
 
@@ -62,20 +64,21 @@ func NewRouter() *gin.Engine {
 	})
 
 	// Endpoint pour mettre à jour les keywords d'un agent existant
-	router.PATCH("/:totp/keywords", func(c *gin.Context) {
-		code := c.Param("totp")
-		r, err := utils.ValidateTOTP(secret, code)
-		if err != nil || !r {
-			c.JSON(401, gin.H{"error": "unauthorized"})
-			return
-		}
-
+	router.PATCH("/keywords", func(c *gin.Context) {
 		var req struct {
+			TOTP     string `form:"totp" json:"totp"`
 			Agent    string `form:"agent" json:"agent" binding:"required"`
 			Keywords string `form:"keywords" json:"keywords" binding:"required"`
 		}
 		if err := c.ShouldBind(&req); err != nil {
 			c.JSON(400, gin.H{"error": "missing fields"})
+			return
+		}
+
+		code := totpCodeFromRequest(c, req.TOTP)
+		r, err := utils.ValidateTOTP(secret, code)
+		if err != nil || !r {
+			c.JSON(401, gin.H{"error": "unauthorized"})
 			return
 		}
 
@@ -93,4 +96,16 @@ func NewRouter() *gin.Engine {
 	})
 
 	return router
+}
+
+func totpCodeFromHeader(c *gin.Context) string {
+	return strings.TrimSpace(c.GetHeader("X-TOTP-Code"))
+}
+
+func totpCodeFromRequest(c *gin.Context, bodyCode string) string {
+	if headerCode := totpCodeFromHeader(c); headerCode != "" {
+		return headerCode
+	}
+
+	return strings.TrimSpace(bodyCode)
 }
