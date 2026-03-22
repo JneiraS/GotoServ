@@ -33,6 +33,11 @@ func NewRouter() *gin.Engine {
 	})
 	// Endpoint de santé pour vérifier que le serveur fonctionne
 	router.GET("/health", func(c *gin.Context) {
+		code, err := utils.GenerateCurrentTOTP(secret)
+		if err == nil {
+			// Affiche le TOTP courant dans les logs à chaque requête /health
+			println("TOTP actuel:", code)
+		}
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
