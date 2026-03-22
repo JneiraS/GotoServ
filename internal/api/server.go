@@ -12,7 +12,7 @@ func StartServer(router *gin.Engine) {
 	if port == "" {
 		port = "8080"
 	}
-	addr := ":" + port
+	addr := "0.0.0.0:" + port
 
 	log.Printf("server started on %s", addr)
 	if err := router.Run(addr); err != nil {
