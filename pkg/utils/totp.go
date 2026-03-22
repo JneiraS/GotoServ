@@ -10,6 +10,7 @@ import (
 
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
+	// "golang.org/x/tools/go/analysis/passes/printf"
 )
 
 func NormalizeSecret(secret string) (string, error) {
@@ -30,20 +31,18 @@ func NormalizeSecret(secret string) (string, error) {
 		return base32.StdEncoding.EncodeToString(raw), nil
 	}
 
-	// ascii/utf-8 -> base32
-	if s != "" {
-		return base32.StdEncoding.EncodeToString([]byte(s)), nil
-	}
-
+	// Si rien ne marche, erreur
 	return "", errors.New("clé secrète invalide")
 }
 
 func GenerateCurrentTOTP(secret string) (string, error) {
+	if strings.TrimSpace(secret) == "" {
+		return "", errors.New("SECRET_KEY vide : vérifiez la variable d'environnement ou le .env")
+	}
 	key, err := NormalizeSecret(secret)
 	if err != nil {
 		return "", err
 	}
-
 	return totp.GenerateCodeCustom(key, time.Now(), totp.ValidateOpts{
 		Period:    60,
 		Digits:    otp.DigitsEight,
