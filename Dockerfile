@@ -16,6 +16,8 @@ ARG GIT_REF=main
 RUN apk add --no-cache git ca-certificates
 
 WORKDIR /src
+# Supprimer le dossier /src avant de cloner pour garantir un clone propre
+RUN rm -rf /src/*
 RUN git clone --depth 1 --branch "${GIT_REF}" "${GIT_REPO}" .
 RUN [ -f /src/assignement_fcb.csv ] || printf 'agent;scope;keywords\n' > /src/assignement_fcb.csv
 
@@ -26,11 +28,16 @@ FROM alpine:3.22 AS runtime-local
 
 WORKDIR /app
 
+# Installer tzdata pour la gestion des fuseaux horaires
+RUN apk add --no-cache tzdata
+
 COPY --from=builder-local /out/gotoserv /app/gotoserv
 COPY assignement_fcb.csv /app/assignement_fcb.csv
+COPY .env /app/.env
 
 ENV PORT=8080
 ENV GIN_MODE=release
+ENV TZ=Europe/Helsinki
 
 EXPOSE 8080
 
@@ -51,7 +58,7 @@ ENV GIN_MODE=release
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=900s --timeout=3s --start-period=10s --retries=3 \
     CMD wget -qO- http://127.0.0.1:${PORT}/health >/dev/null || exit 1
 
 CMD ["/app/gotoserv"]

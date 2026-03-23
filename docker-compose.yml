@@ -13,11 +13,15 @@ services:
     environment:
       - PORT=${PORT:-8080}
       - GIN_MODE=release
+      - TZ=Europe/Paris
     volumes:
       - ./assignement_fcb.csv:/app/assignement_fcb.csv:rw,z
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - ./.env:/app/.env:ro
     ports:
       - "${HOST_PORT:-8080}:${PORT:-8080}"
-    restart: unless-stopped
+    restart: always
     healthcheck:
       test: [ "CMD-SHELL", "wget -qO- http://127.0.0.1:${PORT:-8080}/health >/dev/null || exit 1" ]
       interval: 10s
