@@ -1,4 +1,4 @@
-# GotoServ
+# TOTPGate
 
 API Go (Gin) pour lire et mettre à jour des assignments stockés en CSV, avec protection TOTP.
 
